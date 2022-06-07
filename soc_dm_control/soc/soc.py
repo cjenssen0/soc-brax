@@ -8,6 +8,13 @@ import time
 import soc_dm_control.soc.core as core
 # from spinup.utils.logx import EpochLogger
 
+def from_mujoco_state(s):
+        o = np.array(
+        list(itertools.chain.from_iterable(s.observation.values()))
+        )
+        r = s.reward
+        d = s.last()
+        return o,r,d
 
 class ReplayBuffer:
     """
@@ -52,7 +59,7 @@ def soc(env_fn, actor_critic=core.MLPOptionCritic, ac_kwargs=dict(), seed=0,
         steps_per_epoch=4000, epochs=100, replay_size=int(1e6), gamma=0.99,
         polyak=0.995, lr=1e-3, alpha=0.2, batch_size=100, start_steps=10000,
         update_after=1000, update_every=50, num_test_episodes=10, max_ep_len=1000,
-        logger_kwargs=dict(), save_freq=1, N_options=2, eps=0.1, c=0.03):
+        logger_kwargs=dict(), save_freq=1, N_options=2, eps=0.1, c=0.03, is_mujoco=True):
     """
     Soft Option-Critic (SOC)
 
@@ -156,15 +163,21 @@ def soc(env_fn, actor_critic=core.MLPOptionCritic, ac_kwargs=dict(), seed=0,
     torch.manual_seed(seed)
     np.random.seed(seed)
 
-    env, test_env = env_fn(), env_fn()
-    obs_dim = env.observation_space.shape
-    act_dim = env.action_space.shape[0]
+    env, test_env = env_fn, env_fn
+    if is_mujoco:
+        obs_dim = sum(d[1].shape[0] for d in env.observation_spec().items())
+    else:
+        obs_dim = env.observation_space.shape
+
+    # act_dim = env.action_space.shape[0]
+    act_dim = env.action_spec().shape[0]
 
     # Action limit for clamping: critically, assumes all dimensions share the same bound!
-    act_limit = env.action_space.high[0]
+    # act_limit = env.action_space.high[0]
+    act_limit = env.action_spec().maximum[0]
 
     # Create actor-critic module and target networks
-    ac = actor_critic(env.observation_space, env.action_space, N_options,
+    ac = actor_critic(obs_dim, act_dim, act_limit, N_options,
                       **ac_kwargs)
     ac_targ = deepcopy(ac)
 
@@ -328,7 +341,11 @@ def soc(env_fn, actor_critic=core.MLPOptionCritic, ac_kwargs=dict(), seed=0,
     # Prepare for interaction with environment
     total_steps = steps_per_epoch * epochs
     start_time = time.time()
-    o, ep_ret, ep_len = env.reset(), 0, 0
+    # o, ep_ret, ep_len = env.reset(), 0, 0
+    
+    ep_ret = 0; ep_len = 0
+    s = env.reset()
+    o,_,_ = from_mujoco_state(s)
 
     # Main loop: collect experience in env and update/log each epoch
     for t in range(total_steps):
@@ -344,7 +361,10 @@ def soc(env_fn, actor_critic=core.MLPOptionCritic, ac_kwargs=dict(), seed=0,
             a = get_action(o)
 
             # Step the env
-        o2, r, d, _ = env.step(a)
+        # o2, r, d, _ = env.step(a)
+        s_next = env.step(a)
+        o2,r,d = from_mujoco_state(s_next)
+
         ep_ret += r
         ep_len += 1
 
@@ -366,7 +386,10 @@ def soc(env_fn, actor_critic=core.MLPOptionCritic, ac_kwargs=dict(), seed=0,
         # End of trajectory handling
         if d or (ep_len == max_ep_len):
             # logger.store(EpRet=ep_ret, EpLen=ep_len)
-            o, ep_ret, ep_len = env.reset(), 0, 0
+            # o, ep_ret, ep_len = env.reset(), 0, 0
+            ep_ret=0; ep_len=0
+            s = env.reset()
+            o, r, d = from_mujoco_state(s)
             Qw = ac.Qw(torch.as_tensor(o, dtype=torch.float32))
             ac.pi.currOption = torch.argmax(Qw).numpy()
 

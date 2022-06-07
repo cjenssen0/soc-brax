@@ -122,13 +122,10 @@ class QwFunction(nn.Module):
 
 class MLPOptionCritic(nn.Module):
 
-    def __init__(self, observation_space, action_space, N_options, hidden_sizes=(256, 256),
+    def __init__(self, obs_dim, act_dim, act_limit, N_options, hidden_sizes=(256, 256),
                  activation=nn.ReLU, eps=0.1):
         super().__init__()
 
-        obs_dim = observation_space.shape[0]
-        act_dim = action_space.shape[0]
-        act_limit = action_space.high[0]
         self.eps = eps
 
         # build policy and value functions
