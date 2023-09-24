@@ -5,8 +5,14 @@ import torch
 from torch.optim import Adam
 # import gym
 import time
-import soc_dm_control.soc.core as core
+# import soc_dm_control.soc.core as core
+#from ..soc import core
 # from spinup.utils.logx import EpochLogger
+def core(Class):
+    def __init__(self):
+        self.x = "aa"
+        self.MLPOptionCritic = "je"
+
 
 def from_mujoco_state(s):
         o = np.array(
@@ -448,7 +454,7 @@ if __name__ == '__main__':
     # logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed)
 
     torch.set_num_threads(torch.get_num_threads())
-
+    print("runs from terminal yey")
     # soc(lambda: gym.make(args.env), actor_critic=core.MLPOptionCritic,
     #     ac_kwargs=dict(hidden_sizes=[args.hid]*args.l),
     #     gamma=args.gamma, seed=args.seed, epochs=args.epochs,

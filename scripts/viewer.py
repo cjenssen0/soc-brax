@@ -1,7 +1,7 @@
 #@title All `dm_control` imports required for this tutorial
 
 # soc algo
-from soc_dm_control.soc import soc
+from soc_brax.soc import soc
 
 # The basic mujoco wrapper.
 from dm_control import mujoco

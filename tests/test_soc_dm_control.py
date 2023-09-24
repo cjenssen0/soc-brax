@@ -1,4 +1,4 @@
-from soc_dm_control import __version__
+from soc_brax import __version__
 
 
 def test_version():
