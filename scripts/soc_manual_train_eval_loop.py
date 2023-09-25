@@ -68,7 +68,7 @@ cfg["timesteps"] = 10
 cfg["discount_factor"] = 0.98
 cfg["batch_size"] = 100
 cfg["random_timesteps"] = 0
-cfg["learning_starts"] = 1000
+cfg["learning_starts"] = 0# cfg["learning_starts"] = 1000
 cfg["learn_entropy"] = True
 # logging to TensorBoard and write checkpoints (in timesteps)
 cfg["experiment"]["write_interval"] = 75
