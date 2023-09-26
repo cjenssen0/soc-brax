@@ -48,6 +48,40 @@ class Critic(DeterministicMixin, Model):
         x = F.relu(self.linear_layer_1(torch.cat([inputs["states"], inputs["taken_actions"]], dim=1)))
         x = F.relu(self.linear_layer_2(x))
         return self.linear_layer_3(x), {}
+    
+
+# Intra-Option-value network
+class IntraOptionCritic(DeterministicMixin, Model):
+    def __init__(self, observation_space, action_space, device, N_options=2, clip_actions=False):
+        Model.__init__(self, observation_space, action_space, device)
+        DeterministicMixin.__init__(self, clip_actions)
+
+        self.linear_layer_1 = nn.Linear(self.num_observations + self.num_actions, 400)
+        self.linear_layer_2 = nn.Linear(400, 300)
+        self.linear_layer_3 = nn.Linear(300, N_options)
+
+    def compute(self, inputs, role):
+        x = F.relu(self.linear_layer_1(torch.cat([inputs["states"], inputs["taken_actions"]], dim=1)))
+        x = F.relu(self.linear_layer_2(x))
+        q = F.relu(self.linear_layer_3(x))
+        # return self.linear_layer_3(x), {}
+        return q.gather(-1, inputs["taken_options"]).squeeze(-1), {}
+    
+
+# Option-value network
+class OptionCritic(DeterministicMixin, Model):
+    def __init__(self, observation_space, action_space, device, N_options=2, clip_actions=False):
+        Model.__init__(self, observation_space, action_space, device)
+        DeterministicMixin.__init__(self, clip_actions)
+
+        self.linear_layer_1 = nn.Linear(self.num_observations, 400)
+        self.linear_layer_2 = nn.Linear(400, 300)
+        self.linear_layer_3 = nn.Linear(300, N_options)
+
+    def compute(self, inputs, role):
+        x = F.relu(self.linear_layer_1(inputs["states"]))
+        x = F.relu(self.linear_layer_2(x))
+        return self.linear_layer_3(x), {}
 
 # instantiate a memory as experience replay
 device = env.device
@@ -56,10 +90,10 @@ memory = RandomMemory(memory_size=20000, num_envs=env.num_envs, device=device, r
 # import the agent and its default configuration
 models = {}
 models["policy"] = Actor(env.observation_space, env.action_space, device, clip_actions=True)
-models["critic_1"] = Critic(env.observation_space, env.action_space, device)  # only required during training
-models["critic_2"] = Critic(env.observation_space, env.action_space, device)  # only required during training
-models["target_critic_1"] = Critic(env.observation_space, env.action_space, device)  # only required during training
-models["target_critic_2"] = Critic(env.observation_space, env.action_space, device)  # only required during training
+models["critic_Qw"] = OptionCritic(env.observation_space, env.action_space, device, N_options=2,)  # only required during training
+models["critic_Qu"] = IntraOptionCritic(env.observation_space, env.action_space, device, N_options=2,)  # only required during training
+models["target_critic_Qw"] = OptionCritic(env.observation_space, env.action_space, device, N_options=2)  # only required during training
+models["target_critic_Qu"] = IntraOptionCritic(env.observation_space, env.action_space, device, N_options=2)  # only required during training
 
 # configure and instantiate the agent (visit its documentation to see all the options)
 # https://skrl.readthedocs.io/en/latest/api/agents/soc.html#configuration-and-hyperparameters
