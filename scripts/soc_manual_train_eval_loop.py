@@ -11,7 +11,7 @@ import gymnasium as gym
 from skrl.agents.torch.soc import SOC, SOC_DEFAULT_CONFIG
 
 # load the environment
-env = gym.make('Pendulum-v1')
+env = gym.make('Pendulum-v1', render_mode="rgb_array")
 
 # wrap the environment
 env = wrap_env(env)  # or 'env = wrap_env(env, wrapper="gym")'
@@ -65,7 +65,7 @@ class IntraOptionCritic(DeterministicMixin, Model):
         x = F.relu(self.linear_layer_2(x))
         q = F.relu(self.linear_layer_3(x))
         # return self.linear_layer_3(x), {}
-        return q.gather(-1, inputs["taken_options"]).squeeze(-1), {}
+        return q.gather(-1, inputs["taken_options"]), {}
     
 
 # Option-value network
