@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from skrl.models.torch import DeterministicMixin, GaussianMixin, Model
+from skrl.models.torch import DeterministicMixin, GaussianOptionsMixin, Model
 from skrl.trainers.torch import ManualTrainer
 from skrl.memories.torch import RandomMemory
 from skrl.envs.wrappers.torch import wrap_env
@@ -17,23 +17,32 @@ env = gym.make('Pendulum-v1', render_mode="rgb_array")
 env = wrap_env(env)  # or 'env = wrap_env(env, wrapper="gym")'
 
 ## Define agent
-class Actor(GaussianMixin, Model):
+class Actor(GaussianOptionsMixin, Model):
     def __init__(self, observation_space, action_space, device, clip_actions=False,
-                 clip_log_std=True, min_log_std=-20, max_log_std=2, reduction="sum"):
+                 clip_log_std=True, min_log_std=-20, max_log_std=2, reduction="sum", num_options=2):
         Model.__init__(self, observation_space, action_space, device)
-        GaussianMixin.__init__(self, clip_actions, clip_log_std, min_log_std, max_log_std, reduction)
+        GaussianOptionsMixin.__init__(self, num_options, clip_actions, clip_log_std, min_log_std, max_log_std, reduction)
 
         self.linear_layer_1 = nn.Linear(self.num_observations, 400)
         self.linear_layer_2 = nn.Linear(400, 300)
-        self.action_layer = nn.Linear(300, self.num_actions)
-
+        self.option_action_layer = nn.Linear(300, self.num_options*self.num_actions)
+        #TODO sett inn options-størrelse for layer
+        # self.log_std_parameter = nn.Parameter(torch.zeros(self.num_actions*self.num_options))
         self.log_std_parameter = nn.Parameter(torch.zeros(self.num_actions))
 
     def compute(self, inputs, role):
         x = F.relu(self.linear_layer_1(inputs["states"]))
         x = F.relu(self.linear_layer_2(x))
+        x = self.option_action_layer(x)
+
+        # Reduce dim based on selected options
+        x = x.reshape(-1, self.num_actions, self.num_options)
+        options = inputs["options"].reshape(-1, self.num_actions, 1)
+        x = x.gather(-1, options).squeeze(-1)
+        # log_std_parameter = self.log_std_parameter.unsqueeze(-1).gather(-1, inputs["options"])
+
         # Pendulum-v1 action_space is -2 to 2
-        return 2 * torch.tanh(self.action_layer(x)), self.log_std_parameter, {}
+        return 2 * torch.tanh(x), self.log_std_parameter, {}
 
 class Critic(DeterministicMixin, Model):
     def __init__(self, observation_space, action_space, device, clip_actions=False):
