@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from skrl.models.torch import DeterministicMixin, GaussianOptionsMixin, Model
-from skrl.trainers.torch import ManualTrainer
+from skrl.trainers.torch import ManualTrainer, SequentialTrainer
 from skrl.memories.torch import RandomMemory
 from skrl.envs.wrappers.torch import wrap_env
 import gymnasium as gym
@@ -72,7 +72,7 @@ class IntraOptionCritic(DeterministicMixin, Model):
     def compute(self, inputs, role):
         x = F.relu(self.linear_layer_1(torch.cat([inputs["states"], inputs["taken_actions"]], dim=1)))
         x = F.relu(self.linear_layer_2(x))
-        q = F.relu(self.linear_layer_3(x))
+        q = self.linear_layer_3(x)
         # return self.linear_layer_3(x), {}
         return q.gather(-1, inputs["taken_options"]), {}
     
@@ -137,3 +137,33 @@ for timestep in range(cfg["timesteps"]):
 # evaluate the agent(s)
 for timestep in range(cfg["timesteps"]):
     trainer.eval(timestep=timestep)
+
+
+## FULL RUN
+# configure and instantiate the agent (visit its documentation to see all the options)
+# https://skrl.readthedocs.io/en/latest/api/agents/soc.html#configuration-and-hyperparameters
+cfg = SOC_DEFAULT_CONFIG.copy()
+cfg["discount_factor"] = 0.98
+cfg["batch_size"] = 100
+cfg["random_timesteps"] = 0
+cfg["learning_starts"] = 1000
+cfg["learn_entropy"] = True
+# logging to TensorBoard and write checkpoints (in timesteps)
+cfg["experiment"]["write_interval"] = 75
+cfg["experiment"]["checkpoint_interval"] = 750
+cfg["experiment"]["directory"] = "runs/torch/Pendulum"
+
+agent = SOC(models=models,
+            memory=memory,
+            cfg=cfg,
+            observation_space=env.observation_space,
+            action_space=env.action_space,
+            device=device)
+
+
+# configure and instantiate the RL trainer
+cfg_trainer = {"timesteps": 15000, "headless": True}
+trainer = SequentialTrainer(cfg=cfg_trainer, env=env, agents=[agent])
+
+# start training
+trainer.train()
