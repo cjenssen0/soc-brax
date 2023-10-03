@@ -26,9 +26,19 @@ class Actor(GaussianOptionsMixin, Model):
         self.linear_layer_1 = nn.Linear(self.num_observations, 400)
         self.linear_layer_2 = nn.Linear(400, 300)
         self.option_action_layer = nn.Linear(300, self.num_options*self.num_actions)
+        self.beta = nn.Sequential(
+            nn.Linear(
+                300, self.num_options),
+            nn.Sigmoid())
         #TODO sett inn options-størrelse for layer
         # self.log_std_parameter = nn.Parameter(torch.zeros(self.num_actions*self.num_options))
         self.log_std_parameter = nn.Parameter(torch.zeros(self.num_actions))
+
+    def getBeta(self, inputs, role):
+        x = F.relu(self.linear_layer_1(inputs["states"]))
+        x = F.relu(self.linear_layer_2(x))
+        beta = self.beta(x)
+        return beta
 
     def compute(self, inputs, role):
         x = F.relu(self.linear_layer_1(inputs["states"]))
